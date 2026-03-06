@@ -147,7 +147,7 @@ function createVeinGeometry(
 ): THREE.BufferGeometry {
   const liftCurve = 0.32;
   const maxR = 0.46;
-  const epsilon = 0.005;
+  const epsilon = side === "back" ? 0.018 : 0.005;
   const sign = side === "top" ? 1 : -1;
 
   const len = 0.38;
@@ -283,7 +283,7 @@ function PetuniaHead({
                 <meshStandardMaterial
                   color={colors.vein}
                   emissive={colors.vein}
-                  emissiveIntensity={0.5}
+                  emissiveIntensity={0.85}
                   roughness={0.9}
                   metalness={0.0}
                 />
@@ -294,11 +294,11 @@ function PetuniaHead({
                   <meshStandardMaterial
                     color={colors.vein}
                     emissive={colors.vein}
-                    emissiveIntensity={0.4}
+                    emissiveIntensity={0.75}
                     roughness={0.9}
                     metalness={0.0}
                     transparent
-                    opacity={0.55}
+                    opacity={0.9}
                   />
                 </mesh>
               </group>
@@ -307,11 +307,11 @@ function PetuniaHead({
                   <meshStandardMaterial
                     color={colors.vein}
                     emissive={colors.vein}
-                    emissiveIntensity={0.4}
+                    emissiveIntensity={0.75}
                     roughness={0.9}
                     metalness={0.0}
                     transparent
-                    opacity={0.55}
+                    opacity={0.9}
                   />
                 </mesh>
               </group>
