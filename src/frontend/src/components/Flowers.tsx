@@ -153,8 +153,15 @@ function createVeinGeometry(
   const len = 0.38;
   const w = 0.012;
 
-  // y at base (z=0): liftCurve*(0/maxR)^1.6 = 0
-  const yBase = liftCurve * (0 / maxR) ** 1.6 + sign * epsilon;
+  // For the backside vein, extend the base slightly past z=0 (into negative z)
+  // so the vein visually connects to the flower center when viewed from below.
+  // The petal is tilted forward (tiltX=0.22), so from the underside the base
+  // appears to float unless we start the vein behind z=0.
+  const zBase = side === "back" ? -0.035 : 0;
+
+  // y at base
+  const zBaseForLift = Math.max(0, zBase); // lift formula only valid for z>=0
+  const yBase = liftCurve * (zBaseForLift / maxR) ** 1.6 + sign * epsilon;
   // y at tip (z=len): liftCurve*(len/maxR)^1.6
   const yTip = liftCurve * (len / maxR) ** 1.6 + sign * epsilon;
 
@@ -162,10 +169,10 @@ function createVeinGeometry(
     // base-left,  base-right (wide)
     -w,
     yBase,
-    0,
+    zBase,
     w,
     yBase,
-    0,
+    zBase,
     // tip-left, tip-right (tapered to 30% width)
     -w * 0.3,
     yTip,
