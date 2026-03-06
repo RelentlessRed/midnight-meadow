@@ -77,8 +77,11 @@ function createPetalGeometry(): THREE.BufferGeometry {
   for (let i = 0; i <= radialSegments; i++) {
     const t = i / radialSegments;
     const r = t * maxR;
-    // Petal widens as it goes out: arc half-angle also scales with r
-    const arcHalf = halfAngle * (0.25 + 0.75 * t); // narrow at base, wide at tip
+    // Petal widens as it goes out, but starts wider at the base to close the
+    // gap between adjacent petals near the bottom, while not adding excessive
+    // overlap toward the middle of the petal where they already converge.
+    // Using a sqrt-like curve: wide quickly at low t, then levels off.
+    const arcHalf = halfAngle * (0.55 + 0.45 * Math.sqrt(t)); // wider at base, gently reaches full at tip
 
     const row: THREE.Vector3[] = [];
     for (let j = 0; j <= arcSegments; j++) {
@@ -138,20 +141,22 @@ const petalGeo = createPetalGeometry();
 // The petal surface Y at any z along the center axis (a=0) is:
 //   y_petal(z) = liftCurve * (z / maxR)^1.6
 // where liftCurve=0.32, maxR=0.46.
-// We compute this precisely for the base (z=0) and tip (z=len) vertices
-// and add a small epsilon so the vein sits just above the petal rather than below it.
-function createVeinGeometry(): THREE.BufferGeometry {
+// sign=+1 for topside (epsilon above surface), sign=-1 for backside (epsilon below surface).
+function createVeinGeometry(
+  side: "top" | "back" = "top",
+): THREE.BufferGeometry {
   const liftCurve = 0.32;
   const maxR = 0.46;
-  const epsilon = 0.005; // sit just on top of petal surface
+  const epsilon = 0.005;
+  const sign = side === "top" ? 1 : -1;
 
   const len = 0.38;
   const w = 0.012;
 
   // y at base (z=0): liftCurve*(0/maxR)^1.6 = 0
-  const yBase = liftCurve * (0 / maxR) ** 1.6 + epsilon;
+  const yBase = liftCurve * (0 / maxR) ** 1.6 + sign * epsilon;
   // y at tip (z=len): liftCurve*(len/maxR)^1.6
-  const yTip = liftCurve * (len / maxR) ** 1.6 + epsilon;
+  const yTip = liftCurve * (len / maxR) ** 1.6 + sign * epsilon;
 
   const positions = [
     // base-left,  base-right (wide)
@@ -169,7 +174,8 @@ function createVeinGeometry(): THREE.BufferGeometry {
     yTip,
     len,
   ];
-  const indices = [0, 2, 1, 1, 2, 3];
+  // For backside, flip winding order so it faces downward
+  const indices = side === "top" ? [0, 2, 1, 1, 2, 3] : [0, 1, 2, 1, 3, 2];
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geo.setIndex(indices);
@@ -177,7 +183,8 @@ function createVeinGeometry(): THREE.BufferGeometry {
   return geo;
 }
 
-const veinGeo = createVeinGeometry();
+const veinGeoTop = createVeinGeometry("top");
+const veinGeoBack = createVeinGeometry("back");
 
 const PETAL_COUNT = 7;
 const PETAL_INDICES = Array.from({ length: PETAL_COUNT }, (_, i) => i);
@@ -231,43 +238,80 @@ function PetuniaHead({
                   side={THREE.DoubleSide}
                 />
               </mesh>
-              {/* Center vein */}
-              <mesh geometry={veinGeo}>
+              {/* ── TOPSIDE veins (sit above petal surface) ── */}
+              {/* Center vein - top */}
+              <mesh geometry={veinGeoTop}>
                 <meshStandardMaterial
                   color={colors.vein}
                   emissive={colors.vein}
                   emissiveIntensity={0.6}
                   roughness={0.9}
                   metalness={0.0}
-                  side={THREE.DoubleSide}
                 />
               </mesh>
-              {/* Two side veins, angled slightly off center */}
+              {/* Side veins - top */}
               <group rotation={[0, 0.28, 0]}>
-                <mesh geometry={veinGeo}>
+                <mesh geometry={veinGeoTop}>
                   <meshStandardMaterial
                     color={colors.vein}
                     emissive={colors.vein}
                     emissiveIntensity={0.5}
                     roughness={0.9}
                     metalness={0.0}
-                    side={THREE.DoubleSide}
                     transparent
                     opacity={0.6}
                   />
                 </mesh>
               </group>
               <group rotation={[0, -0.28, 0]}>
-                <mesh geometry={veinGeo}>
+                <mesh geometry={veinGeoTop}>
                   <meshStandardMaterial
                     color={colors.vein}
                     emissive={colors.vein}
                     emissiveIntensity={0.5}
                     roughness={0.9}
                     metalness={0.0}
-                    side={THREE.DoubleSide}
                     transparent
                     opacity={0.6}
+                  />
+                </mesh>
+              </group>
+
+              {/* ── BACKSIDE veins (sit below petal surface, face downward) ── */}
+              {/* Center vein - back */}
+              <mesh geometry={veinGeoBack}>
+                <meshStandardMaterial
+                  color={colors.vein}
+                  emissive={colors.vein}
+                  emissiveIntensity={0.5}
+                  roughness={0.9}
+                  metalness={0.0}
+                />
+              </mesh>
+              {/* Side veins - back */}
+              <group rotation={[0, 0.28, 0]}>
+                <mesh geometry={veinGeoBack}>
+                  <meshStandardMaterial
+                    color={colors.vein}
+                    emissive={colors.vein}
+                    emissiveIntensity={0.4}
+                    roughness={0.9}
+                    metalness={0.0}
+                    transparent
+                    opacity={0.55}
+                  />
+                </mesh>
+              </group>
+              <group rotation={[0, -0.28, 0]}>
+                <mesh geometry={veinGeoBack}>
+                  <meshStandardMaterial
+                    color={colors.vein}
+                    emissive={colors.vein}
+                    emissiveIntensity={0.4}
+                    roughness={0.9}
+                    metalness={0.0}
+                    transparent
+                    opacity={0.55}
                   />
                 </mesh>
               </group>
