@@ -137,11 +137,17 @@ function createPetalGeometry(): THREE.BufferGeometry {
 
 const petalGeo = createPetalGeometry();
 
-// Vein geometry: thin tapered strip that follows the petal surface exactly.
-// The petal surface Y at any z along the center axis (a=0) is:
+// Vein geometry: tapered strip that follows the petal surface exactly and
+// extends all the way to (and slightly past) the petal base so it visually
+// connects to the flower throat from both top and bottom views.
+//
+// The petal surface Y at any z along the center axis (a=0):
 //   y_petal(z) = liftCurve * (z / maxR)^1.6
 // where liftCurve=0.32, maxR=0.46.
-// sign=+1 for topside (epsilon above surface), sign=-1 for backside (epsilon below surface).
+// sign=+1 for topside (epsilon above surface), sign=-1 for backside (epsilon below).
+//
+// Both sides start well behind z=0 so the vein visually merges into the
+// flower throat regardless of viewing angle.
 function createVeinGeometry(
   side: "top" | "back" = "top",
 ): THREE.BufferGeometry {
@@ -150,39 +156,49 @@ function createVeinGeometry(
   const epsilon = side === "back" ? 0.018 : 0.005;
   const sign = side === "top" ? 1 : -1;
 
-  const len = 0.38;
-  const w = 0.012;
+  const len = 0.4; // vein tip extends to 87% of petal length
+  // Both sides start noticeably behind the petal origin so the vein
+  // is visually anchored at the flower center when viewed from any angle.
+  const zBase = -0.06;
+  const wBase = 0.03; // wider base so connection is clearly visible
+  const wTip = 0.006; // taper to a fine point at the tip
 
-  // For the backside vein, extend the base slightly past z=0 (into negative z)
-  // so the vein visually connects to the flower center when viewed from below.
-  // The petal is tilted forward (tiltX=0.22), so from the underside the base
-  // appears to float unless we start the vein behind z=0.
-  const zBase = side === "back" ? -0.035 : 0;
+  // Use multi-segment strip (base → neck → tip) so the Y follows the
+  // petal surface through its full curve rather than jumping between
+  // two extreme points.
+  const segments = 8;
+  const positions: number[] = [];
+  const indices: number[] = [];
 
-  // y at base
-  const zBaseForLift = Math.max(0, zBase); // lift formula only valid for z>=0
-  const yBase = liftCurve * (zBaseForLift / maxR) ** 1.6 + sign * epsilon;
-  // y at tip (z=len): liftCurve*(len/maxR)^1.6
-  const yTip = liftCurve * (len / maxR) ** 1.6 + sign * epsilon;
+  for (let i = 0; i <= segments; i++) {
+    const s = i / segments; // 0 at base, 1 at tip
+    const z = zBase + s * (len - zBase);
+    // Clamp z for the lift formula (surface only defined for z>=0)
+    const zForLift = Math.max(0, z);
+    const yPetal = liftCurve * (zForLift / maxR) ** 1.6;
+    const y = yPetal + sign * epsilon;
+    // Width tapers from wBase at s=0 to wTip at s=1
+    const w = wBase + (wTip - wBase) * s;
 
-  const positions = [
-    // base-left,  base-right (wide)
-    -w,
-    yBase,
-    zBase,
-    w,
-    yBase,
-    zBase,
-    // tip-left, tip-right (tapered to 30% width)
-    -w * 0.3,
-    yTip,
-    len,
-    w * 0.3,
-    yTip,
-    len,
-  ];
-  // For backside, flip winding order so it faces downward
-  const indices = side === "top" ? [0, 2, 1, 1, 2, 3] : [0, 1, 2, 1, 3, 2];
+    positions.push(-w, y, z);
+    positions.push(w, y, z);
+  }
+
+  for (let i = 0; i < segments; i++) {
+    const bl = i * 2;
+    const br = i * 2 + 1;
+    const tl = (i + 1) * 2;
+    const tr = (i + 1) * 2 + 1;
+    if (side === "top") {
+      indices.push(bl, tl, br);
+      indices.push(br, tl, tr);
+    } else {
+      // flip winding so normals face downward for backside
+      indices.push(bl, br, tl);
+      indices.push(br, tr, tl);
+    }
+  }
+
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geo.setIndex(indices);
