@@ -206,8 +206,63 @@ function createVeinGeometry(
   return geo;
 }
 
+// Sub-vein geometry: same structure as the main vein but noticeably wider
+// and slightly shorter (they branch off to the sides so they don't reach
+// the full petal length). Used for both topside and backside side veins.
+function createSubVeinGeometry(
+  side: "top" | "back" = "top",
+): THREE.BufferGeometry {
+  const liftCurve = 0.32;
+  const maxR = 0.46;
+  const epsilon = side === "back" ? 0.02 : 0.007;
+  const sign = side === "top" ? 1 : -1;
+
+  const len = 0.36; // slightly shorter than main vein
+  const zBase = -0.06; // same deep base so it connects at throat
+  const wBase = 0.048; // ~1.6x wider than main vein base (0.030)
+  const wTip = 0.01; // wider tip too
+
+  const segments = 8;
+  const positions: number[] = [];
+  const indices: number[] = [];
+
+  for (let i = 0; i <= segments; i++) {
+    const s = i / segments;
+    const z = zBase + s * (len - zBase);
+    const zForLift = Math.max(0, z);
+    const yPetal = liftCurve * (zForLift / maxR) ** 1.6;
+    const y = yPetal + sign * epsilon;
+    const w = wBase + (wTip - wBase) * s;
+
+    positions.push(-w, y, z);
+    positions.push(w, y, z);
+  }
+
+  for (let i = 0; i < segments; i++) {
+    const bl = i * 2;
+    const br = i * 2 + 1;
+    const tl = (i + 1) * 2;
+    const tr = (i + 1) * 2 + 1;
+    if (side === "top") {
+      indices.push(bl, tl, br);
+      indices.push(br, tl, tr);
+    } else {
+      indices.push(bl, br, tl);
+      indices.push(br, tr, tl);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
+
 const veinGeoTop = createVeinGeometry("top");
 const veinGeoBack = createVeinGeometry("back");
+const subVeinGeoTop = createSubVeinGeometry("top");
+const subVeinGeoBack = createSubVeinGeometry("back");
 
 const PETAL_COUNT = 7;
 const PETAL_INDICES = Array.from({ length: PETAL_COUNT }, (_, i) => i);
@@ -272,30 +327,30 @@ function PetuniaHead({
                   metalness={0.0}
                 />
               </mesh>
-              {/* Side veins - top */}
+              {/* Side veins - top (enlarged subveins) */}
               <group rotation={[0, 0.28, 0]}>
-                <mesh geometry={veinGeoTop}>
+                <mesh geometry={subVeinGeoTop}>
                   <meshStandardMaterial
                     color={colors.vein}
                     emissive={colors.vein}
-                    emissiveIntensity={0.5}
+                    emissiveIntensity={0.55}
                     roughness={0.9}
                     metalness={0.0}
                     transparent
-                    opacity={0.6}
+                    opacity={0.75}
                   />
                 </mesh>
               </group>
               <group rotation={[0, -0.28, 0]}>
-                <mesh geometry={veinGeoTop}>
+                <mesh geometry={subVeinGeoTop}>
                   <meshStandardMaterial
                     color={colors.vein}
                     emissive={colors.vein}
-                    emissiveIntensity={0.5}
+                    emissiveIntensity={0.55}
                     roughness={0.9}
                     metalness={0.0}
                     transparent
-                    opacity={0.6}
+                    opacity={0.75}
                   />
                 </mesh>
               </group>
@@ -311,13 +366,13 @@ function PetuniaHead({
                   metalness={0.0}
                 />
               </mesh>
-              {/* Side veins - back */}
+              {/* Side veins - back (same enlarged size as topside subveins) */}
               <group rotation={[0, 0.28, 0]}>
-                <mesh geometry={veinGeoBack}>
+                <mesh geometry={subVeinGeoBack}>
                   <meshStandardMaterial
                     color={colors.vein}
                     emissive={colors.vein}
-                    emissiveIntensity={0.75}
+                    emissiveIntensity={0.85}
                     roughness={0.9}
                     metalness={0.0}
                     transparent
@@ -326,11 +381,11 @@ function PetuniaHead({
                 </mesh>
               </group>
               <group rotation={[0, -0.28, 0]}>
-                <mesh geometry={veinGeoBack}>
+                <mesh geometry={subVeinGeoBack}>
                   <meshStandardMaterial
                     color={colors.vein}
                     emissive={colors.vein}
-                    emissiveIntensity={0.75}
+                    emissiveIntensity={0.85}
                     roughness={0.9}
                     metalness={0.0}
                     transparent
